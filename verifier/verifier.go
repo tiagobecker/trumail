@@ -13,6 +13,8 @@ type Verifier struct {
 	client               *httpclient.Client
 	hostname, sourceAddr string
 	disp                 *Disposabler
+	free                 *Free
+	role                 *Role
 }
 
 // NewVerifier generates a new httpclient.Client using the passed timeout
@@ -20,7 +22,7 @@ type Verifier struct {
 // email addresses
 func NewVerifier(hostname, sourceAddr string) *Verifier {
 	client := httpclient.New(time.Second*30, nil)
-	return &Verifier{client, hostname, sourceAddr, NewDisposabler(client)}
+	return &Verifier{client, hostname, sourceAddr, NewDisposabler(client), NewFree(client), NewRole(client)}
 }
 
 // Lookup contains all output data for an email verification Lookup
@@ -34,6 +36,8 @@ type Lookup struct {
 	CatchAll    bool `json:"catchAll" xml:"catchAll"`
 	Disposable  bool `json:"disposable" xml:"disposable"`
 	Gravatar    bool `json:"gravatar" xml:"gravatar"`
+	Free        bool `json:"free" xml:"free"`
+	Role        bool `json:"role" xml:"role"`
 }
 
 // VerifyTimeout performs an email verification, failing with an ErrTimeout
@@ -85,6 +89,8 @@ func (v *Verifier) Verify(email string) (*Lookup, error) {
 	// Set all parse dependent but SMTP independent values
 	l.Disposable = v.disp.IsDisposable(address.Domain)
 	l.Gravatar = v.HasGravatar(address.MD5Hash)
+	l.Free = v.free.IsFree(address.Domain)
+	l.Role = v.role.IsRole(address.Username)
 
 	// Attempt to form an SMTP Connection
 	del, err := NewDeliverabler(address.Domain, v.hostname, v.sourceAddr)
